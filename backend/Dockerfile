@@ -8,8 +8,9 @@ RUN pip install uv
 COPY pyproject.toml uv.lock* ./
 RUN uv sync --no-dev --no-install-project
 
-# Copy application code
+# Copy application code and install project
 COPY src/ src/
+RUN uv sync --no-dev
 
 ENV PATH="/app/.venv/bin:$PATH"
 
