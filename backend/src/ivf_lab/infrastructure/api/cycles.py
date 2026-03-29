@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ivf_lab.domain.models.cycle import Cycle
 from ivf_lab.domain.models.embryo import Embryo
 from ivf_lab.domain.models.embryo_event import EmbryoEvent
+from ivf_lab.domain.models.user import User
 from ivf_lab.domain.repositories.cycle_repo import CycleRepository
 from ivf_lab.domain.services import cycle_service
 from ivf_lab.infrastructure.api.deps import get_current_user, get_db
@@ -84,7 +85,11 @@ def _build_summary(embryos: list[Embryo]) -> dict:
     }
 
 
-def _cycle_to_response(cycle: Cycle, alias_code: str | None = None) -> CycleResponse:
+def _cycle_to_response(
+    cycle: Cycle,
+    alias_code: str | None = None,
+    embryologist_name: str | None = None,
+) -> CycleResponse:
     return CycleResponse(
         id=str(cycle.id),
         clinic_id=str(cycle.clinic_id),
@@ -101,9 +106,29 @@ def _cycle_to_response(cycle: Cycle, alias_code: str | None = None) -> CycleResp
         assigned_embryologist_id=str(cycle.assigned_embryologist_id)
         if cycle.assigned_embryologist_id
         else None,
+        assigned_embryologist_name=embryologist_name,
         notes=cycle.notes,
         created_at=cycle.created_at.isoformat(),
     )
+
+
+async def _resolve_cycle_context(
+    session: AsyncSession,
+    cycle: Cycle,
+) -> tuple[str | None, str | None]:
+    """Resolve patient alias code and embryologist name for a cycle."""
+    alias_code = None
+    embryologist_name = None
+    if cycle.patient_alias_id:
+        from ivf_lab.domain.models.patient_alias import PatientAlias
+        alias = await session.get(PatientAlias, cycle.patient_alias_id)
+        if alias:
+            alias_code = alias.alias_code
+    if cycle.assigned_embryologist_id:
+        user = await session.get(User, cycle.assigned_embryologist_id)
+        if user:
+            embryologist_name = user.full_name
+    return alias_code, embryologist_name
 
 
 def _cycle_to_detail(
@@ -111,13 +136,14 @@ def _cycle_to_detail(
     embryos: list[Embryo],
     latest_grades: dict[uuid.UUID, EmbryoEvent],
     alias_code: str | None = None,
+    embryologist_name: str | None = None,
 ) -> CycleDetailResponse:
     embryo_summaries = [
         _embryo_to_summary(e, latest_grades.get(e.id), cycle.insemination_time)
         for e in embryos
     ]
     summary = _build_summary(embryos)
-    base = _cycle_to_response(cycle, alias_code)
+    base = _cycle_to_response(cycle, alias_code, embryologist_name)
     return CycleDetailResponse(
         **base.model_dump(),
         embryos=embryo_summaries,
@@ -157,7 +183,8 @@ async def get_today_cycles(
         embryos = await repo.get_embryos_for_cycle(cycle.id)
         embryo_ids = [e.id for e in embryos]
         latest_grades = await repo.get_latest_grade_events(embryo_ids)
-        detail = _cycle_to_detail(cycle, embryos, latest_grades)
+        alias_code, embryologist_name = await _resolve_cycle_context(session, cycle)
+        detail = _cycle_to_detail(cycle, embryos, latest_grades, alias_code, embryologist_name)
         cycle_details.append(detail)
 
     return CycleTodayResponse(
@@ -266,10 +293,8 @@ async def get_cycle(
     if not cycle:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cycle not found")
 
-    patient_alias = await repo.get_patient_alias(cycle.patient_alias_id)
-    alias_code = patient_alias.alias_code if patient_alias else None
-
-    return _cycle_to_detail(cycle, embryos, latest_grades, alias_code)
+    alias_code, embryologist_name = await _resolve_cycle_context(session, cycle)
+    return _cycle_to_detail(cycle, embryos, latest_grades, alias_code, embryologist_name)
 
 
 @router.patch("/{id}", response_model=CycleResponse)

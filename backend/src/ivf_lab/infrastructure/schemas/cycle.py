@@ -46,6 +46,7 @@ class CycleResponse(BaseModel):
     transfer_date: date | None
     outcome: str | None
     assigned_embryologist_id: str | None
+    assigned_embryologist_name: str | None = None
     notes: str | None
     created_at: str
 
