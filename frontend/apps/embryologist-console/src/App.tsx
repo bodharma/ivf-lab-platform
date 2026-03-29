@@ -3,10 +3,9 @@ import { useAuth } from './hooks/useAuth'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
-
-function CycleView() {
-  return <div className="p-6">Cycle View</div>
-}
+import CycleView from './pages/CycleView'
+import EmbryoDetail from './pages/EmbryoDetail'
+import ChecklistRunner from './pages/ChecklistRunner'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth()
@@ -29,6 +28,8 @@ export default function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="cycles/:id" element={<CycleView />} />
+          <Route path="embryos/:id" element={<EmbryoDetail />} />
+          <Route path="checklists/:id" element={<ChecklistRunner />} />
         </Route>
       </Routes>
     </BrowserRouter>
