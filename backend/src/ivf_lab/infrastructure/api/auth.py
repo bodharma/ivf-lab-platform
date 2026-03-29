@@ -1,0 +1,59 @@
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ivf_lab.domain.repositories.user_repo import UserRepository
+from ivf_lab.domain.services.auth_service import AuthService
+from ivf_lab.infrastructure.api.deps import get_current_user, get_db
+from ivf_lab.infrastructure.schemas.auth import (
+    LoginRequest,
+    RefreshRequest,
+    TokenResponse,
+    UserResponse,
+)
+
+router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+@router.post("/login", response_model=TokenResponse)
+async def login(
+    body: LoginRequest,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> TokenResponse:
+    service = AuthService(UserRepository(session))
+    result = await service.login(body.email, body.password)
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+    return TokenResponse(**result)
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh(body: RefreshRequest) -> TokenResponse:
+    service = AuthService.__new__(AuthService)
+    result = service.refresh(body.refresh_token)
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+        )
+    return TokenResponse(
+        access_token=result["access_token"],
+        refresh_token=body.refresh_token,
+    )
+
+
+@router.get("/me", response_model=UserResponse)
+async def me(
+    current_user: Annotated[dict, Depends(get_current_user)],
+) -> UserResponse:
+    return UserResponse(
+        id=current_user["sub"],
+        email="",
+        full_name="",
+        role=current_user["role"],
+        clinic_id=current_user["clinic_id"],
+    )
