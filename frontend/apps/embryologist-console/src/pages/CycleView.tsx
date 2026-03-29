@@ -1,8 +1,8 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCycleDetail, useCycleChecklists } from '../hooks/useEmbryos'
 import { api } from '../api/client'
-import type { EmbryoSummary, EmbryoEvent, ChecklistInstance } from '../types'
+import type { EmbryoSummary, EmbryoEvent, ChecklistInstance, ChecklistTemplate } from '../types'
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -179,6 +179,43 @@ function EmbryoTable({
         </tbody>
       </table>
     </div>
+  )
+}
+
+function NewChecklistButton({ cycleId }: { cycleId: string }) {
+  const qc = useQueryClient()
+  const navigate = useNavigate()
+
+  const { data: templates = [] } = useQuery({
+    queryKey: ['checklist-templates'],
+    queryFn: () => api.get<ChecklistTemplate[]>('/checklist-templates'),
+  })
+
+  const createMutation = useMutation({
+    mutationFn: (templateId: string) =>
+      api.post<ChecklistInstance>(`/cycles/${cycleId}/checklists`, { template_id: templateId }),
+    onSuccess: (instance) => {
+      void qc.invalidateQueries({ queryKey: ['cycles', cycleId, 'checklists'] })
+      navigate(`/checklists/${instance.id}`)
+    },
+  })
+
+  if (templates.length === 0) return null
+
+  return (
+    <select
+      className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 cursor-pointer"
+      defaultValue=""
+      onChange={(e) => {
+        if (e.target.value) createMutation.mutate(e.target.value)
+      }}
+      disabled={createMutation.isPending}
+    >
+      <option value="" disabled>{createMutation.isPending ? 'Creating...' : '+ New Checklist'}</option>
+      {templates.map((t) => (
+        <option key={t.id} value={t.id}>{t.name}</option>
+      ))}
+    </select>
   )
 }
 
@@ -390,12 +427,7 @@ export default function CycleView() {
               <span className="ml-2 text-xs font-normal text-gray-400">Loading...</span>
             )}
           </h2>
-          <Link
-            to="/settings"
-            className="text-xs text-blue-600 hover:underline"
-          >
-            Manage Templates
-          </Link>
+          <NewChecklistButton cycleId={cycleId} />
         </div>
         <div className="px-5 py-2">
           <ChecklistsSection checklists={checklists} />
