@@ -10,6 +10,7 @@ from sqlalchemy.pool import NullPool
 
 from ivf_lab.config.settings import settings
 from ivf_lab.domain.models.clinic import Clinic
+from ivf_lab.domain.models.cycle import Cycle
 from ivf_lab.domain.models.patient_alias import PatientAlias
 from ivf_lab.domain.models.user import User
 from ivf_lab.infrastructure.auth.password import hash_password
@@ -23,25 +24,20 @@ def _make_session_factory() -> async_sessionmaker[AsyncSession]:
     return async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
 
 
-@pytest.fixture(scope="session", autouse=True)
-def cleanup_stale_test_data() -> None:
+@pytest_asyncio.fixture(scope="session", autouse=True, loop_scope="session")
+async def cleanup_stale_test_data() -> None:
     """Remove any stale test data left by previous failed test runs."""
-    import asyncio
-
-    async def _cleanup() -> None:
-        factory = _make_session_factory()
-        async with factory() as sess:
-            result = await sess.execute(select(Clinic.id).where(Clinic.name == "Test Clinic"))
-            clinic_ids = [row[0] for row in result.fetchall()]
-            if clinic_ids:
-                for cid in clinic_ids:
-                    await sess.execute(delete(PatientAlias).where(PatientAlias.clinic_id == cid))
-                await sess.execute(delete(User).where(User.email == "embryologist@test.com"))
-                for cid in clinic_ids:
-                    await sess.execute(delete(Clinic).where(Clinic.id == cid))
-            await sess.commit()
-
-    asyncio.run(_cleanup())
+    factory = _make_session_factory()
+    async with factory() as sess:
+        result = await sess.execute(select(Clinic.id).where(Clinic.name == "Test Clinic"))
+        clinic_ids = [row[0] for row in result.fetchall()]
+        if clinic_ids:
+            for cid in clinic_ids:
+                await sess.execute(delete(PatientAlias).where(PatientAlias.clinic_id == cid))
+            await sess.execute(delete(User).where(User.email == "embryologist@test.com"))
+            for cid in clinic_ids:
+                await sess.execute(delete(Clinic).where(Clinic.id == cid))
+        await sess.commit()
 
 
 @pytest_asyncio.fixture
