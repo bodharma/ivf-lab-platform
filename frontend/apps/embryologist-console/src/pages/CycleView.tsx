@@ -334,9 +334,24 @@ export default function CycleView() {
               ({cycle.embryos?.length ?? 0})
             </span>
           </h2>
-          <button className="px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
-            + Record Event
-          </button>
+          {cycle.embryos && cycle.embryos.length > 0 && (
+            <select
+              className="px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors cursor-pointer"
+              defaultValue=""
+              onChange={(e) => {
+                if (e.target.value) navigate(`/embryos/${e.target.value}`)
+              }}
+            >
+              <option value="" disabled>+ Record Event</option>
+              {cycle.embryos
+                .filter((em: EmbryoSummary) => em.disposition === 'in_culture')
+                .map((em: EmbryoSummary) => (
+                  <option key={em.id} value={em.id}>
+                    {em.embryo_code} — Grade / Observe / Dispose
+                  </option>
+                ))}
+            </select>
+          )}
         </div>
         <div className="px-5 py-2">
           <EmbryoTable
