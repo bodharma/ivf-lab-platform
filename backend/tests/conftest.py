@@ -36,19 +36,27 @@ async def _delete_clinic_data(sess: AsyncSession, clinic_id: uuid.UUID) -> None:
     await sess.execute(delete(Clinic).where(Clinic.id == clinic_id))
 
 
-@pytest_asyncio.fixture(scope="session", autouse=True, loop_scope="session")
-async def cleanup_stale_test_data() -> None:
-    """Remove any stale test data left by previous failed test runs."""
-    factory = _make_session_factory()
-    async with factory() as sess:
-        result = await sess.execute(select(Clinic.id).where(Clinic.name == "Test Clinic"))
-        clinic_ids = [row[0] for row in result.fetchall()]
-        if clinic_ids:
-            for cid in clinic_ids:
-                await _delete_clinic_data(sess, cid)
-        # Also clean up any orphaned test users not covered by clinic deletion
-        await sess.execute(delete(User).where(User.email == "embryologist@test.com"))
-        await sess.commit()
+def pytest_configure(config: object) -> None:
+    """Clean up stale test data before the test session starts.
+
+    Runs before any fixtures or tests, in its own asyncio.run() call so it is
+    completely independent of the per-test event loops managed by pytest-asyncio.
+    """
+    import asyncio
+
+    async def _cleanup() -> None:
+        factory = _make_session_factory()
+        async with factory() as sess:
+            result = await sess.execute(select(Clinic.id).where(Clinic.name == "Test Clinic"))
+            clinic_ids = [row[0] for row in result.fetchall()]
+            if clinic_ids:
+                for cid in clinic_ids:
+                    await _delete_clinic_data(sess, cid)
+            # Also clean up any orphaned test users not covered by clinic deletion
+            await sess.execute(delete(User).where(User.email == "embryologist@test.com"))
+            await sess.commit()
+
+    asyncio.run(_cleanup())
 
 
 @pytest_asyncio.fixture
@@ -86,8 +94,13 @@ async def test_user(test_clinic: Clinic) -> AsyncGenerator[User, None]:
 
     yield user
 
-    # User deletion is handled by test_clinic teardown via _delete_clinic_data
-    # which deletes in FK-safe order (embryo_events → embryos → cycles → ... → users → clinic)
+    # Delete embryo_events referencing this user first, then the user itself.
+    # This runs before test_clinic teardown so there is never a window where
+    # multiple test users with the same email exist simultaneously.
+    async with factory() as sess:
+        await sess.execute(delete(EmbryoEvent).where(EmbryoEvent.performed_by == user.id))
+        await sess.execute(delete(User).where(User.id == user.id))
+        await sess.commit()
 
 
 @pytest_asyncio.fixture
