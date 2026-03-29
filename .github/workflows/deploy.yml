@@ -1,0 +1,76 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        working-directory: backend
+        run: uv python install 3.12
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build frontend
+        working-directory: frontend/apps/embryologist-console
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build backend Docker image
+        working-directory: backend
+        run: docker build -t ivf-lab-app:latest .
+
+      - name: Save Docker image
+        run: docker save ivf-lab-app:latest | gzip > /tmp/ivf-lab-app.tar.gz
+
+      - name: Deploy to server
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          # Copy Docker image
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key \
+            /tmp/ivf-lab-app.tar.gz ${DEPLOY_HOST}:/tmp/
+
+          # Copy frontend build
+          rsync -avz -e "ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key" \
+            frontend/apps/embryologist-console/dist/ \
+            ${DEPLOY_HOST}:/opt/ivf-lab-platform/frontend/dist/
+
+          # Copy ops configs
+          rsync -avz -e "ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key" \
+            ops/ ${DEPLOY_HOST}:/opt/ivf-lab-platform/ops/
+
+          # Deploy on server
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key ${DEPLOY_HOST} << 'EOF'
+          docker load < /tmp/ivf-lab-app.tar.gz
+          cd /opt/ivf-lab-platform
+          docker compose -f ops/docker/docker-compose.yml run --rm app alembic upgrade head
+          docker compose -f ops/docker/docker-compose.yml up -d
+          rm /tmp/ivf-lab-app.tar.gz
+          EOF
