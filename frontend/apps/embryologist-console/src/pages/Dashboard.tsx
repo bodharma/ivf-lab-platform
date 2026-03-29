@@ -13,20 +13,14 @@ function getCurrentDay(inseminationTime: string | null): number | null {
   return Math.floor(hours / 24)
 }
 
-interface LatestGrade {
-  expansion?: number | null
-  icm?: string | null
-  te?: string | null
-  cell_count?: number | null
-  pronuclei?: number | null
-}
-
 function formatGrade(embryo: EmbryoSummary): string {
   if (!embryo.latest_grade) return '--'
-  const g = embryo.latest_grade as LatestGrade
+  // Grade data is nested inside .data when coming from the API
+  const raw = embryo.latest_grade as Record<string, unknown>
+  const g = (raw.data ?? raw) as Record<string, unknown>
   if (g.expansion) return `${g.expansion}${g.icm ?? ''}${g.te ?? ''}` // blastocyst: "4AB"
   if (g.cell_count) return `${g.cell_count}c` // cleavage: "8c"
-  if (g.pronuclei) return `${g.pronuclei}pn` // fertilization: "2pn"
+  if (g.pronuclei) return String(g.pronuclei).toUpperCase() // fertilization: "2PN"
   return '--'
 }
 
@@ -104,16 +98,16 @@ function CycleCard({ cycle }: { cycle: CycleDetail }) {
       <div className="flex items-start justify-between mb-3">
         <div>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-gray-900">{cycle.patient_alias_id}</span>
+            <span className="font-semibold text-gray-900">
+              {(cycle as unknown as Record<string, unknown>).patient_alias_code as string || cycle.cycle_code}
+            </span>
             <span className="text-xs font-mono bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
               {cycle.cycle_code}
             </span>
             <span className="text-xs text-gray-500 capitalize">{cycle.cycle_type}</span>
           </div>
           {cycle.assigned_embryologist_id && (
-            <p className="text-xs text-gray-400 mt-0.5">
-              Embryologist: {cycle.assigned_embryologist_id}
-            </p>
+            <p className="text-xs text-gray-400 mt-0.5">Assigned</p>
           )}
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0 ml-4">

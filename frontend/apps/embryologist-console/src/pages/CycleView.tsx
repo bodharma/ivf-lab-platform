@@ -50,29 +50,25 @@ function computeHPI(inseminationTime: string | null | undefined): string {
 /** Format grade from latest_grade record, mirroring Dashboard conventions */
 function formatGrade(latestGrade: Record<string, unknown> | null | undefined): string {
   if (!latestGrade) return '--'
+  // Grade data is nested inside .data when coming from the API
+  const g = (latestGrade.data ?? latestGrade) as Record<string, unknown>
 
   // Gardner blastocyst: expansion + icm + te → e.g. "4AB"
-  if (
-    latestGrade.expansion !== undefined &&
-    latestGrade.icm !== undefined &&
-    latestGrade.te !== undefined
-  ) {
-    return `${latestGrade.expansion}${latestGrade.icm}${latestGrade.te}`
+  if (g.expansion !== undefined) {
+    return `${g.expansion}${g.icm ?? ''}${g.te ?? ''}`
   }
 
   // Cleavage: cell_count → e.g. "8c"
-  if (latestGrade.cell_count !== undefined) {
-    return `${latestGrade.cell_count}c`
+  if (g.cell_count !== undefined) {
+    return `${g.cell_count}c`
   }
 
-  // Fertilization: pronuclei_count → e.g. "2pn"
-  if (latestGrade.pronuclei_count !== undefined) {
-    return `${latestGrade.pronuclei_count}pn`
+  // Fertilization: pronuclei → e.g. "2PN"
+  if (g.pronuclei !== undefined) {
+    return String(g.pronuclei).toUpperCase()
   }
 
-  // Fallback: first string value
-  const firstValue = Object.values(latestGrade)[0]
-  return firstValue !== undefined ? String(firstValue) : '--'
+  return '--'
 }
 
 /** Infer current day from insemination_time */
@@ -336,7 +332,7 @@ export default function CycleView() {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              {cycle.patient_alias_id}
+              {(cycle as unknown as Record<string, unknown>).patient_alias_code as string || cycle.cycle_code}
               <span className="text-gray-400 font-normal mx-2">·</span>
               {cycle.cycle_code}
             </h1>
@@ -376,7 +372,7 @@ export default function CycleView() {
           {cycle.assigned_embryologist_id && (
             <div className="flex gap-2">
               <dt className="font-medium text-gray-500 w-28">Assigned</dt>
-              <dd className="text-gray-800">{cycle.assigned_embryologist_id}</dd>
+              <dd className="text-gray-800">Assigned</dd>
             </div>
           )}
         </dl>
