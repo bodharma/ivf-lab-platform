@@ -5,7 +5,7 @@ x-shared-env: &shared-env
   # App
   IVF_SECRET_KEY: ${IVF_SECRET_KEY:-change-me-in-production}
   IVF_DEBUG: ${IVF_DEBUG:-false}
-  IVF_ALLOWED_ORIGINS: ${IVF_ALLOWED_ORIGINS:-*}
+  IVF_ALLOWED_ORIGINS: ${IVF_ALLOWED_ORIGINS:-http://localhost:3000}
 
   # Redis
   IVF_REDIS_URL: redis://redis:6379/0
