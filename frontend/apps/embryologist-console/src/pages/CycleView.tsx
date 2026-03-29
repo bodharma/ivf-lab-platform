@@ -1,6 +1,8 @@
 import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useCycleDetail, useCycleChecklists } from '../hooks/useEmbryos'
-import type { EmbryoSummary, ChecklistInstance } from '../types'
+import { api } from '../api/client'
+import type { EmbryoSummary, EmbryoEvent, ChecklistInstance } from '../types'
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -201,7 +203,12 @@ function ChecklistsSection({ checklists }: { checklists: ChecklistInstance[] }) 
               to={`/checklists/${cl.id}`}
               className="text-sm font-medium text-gray-800 hover:text-blue-600 hover:underline"
             >
-              {cl.template_id}
+              Checklist
+              {cl.items.length > 0 && (
+                <span className="ml-1.5 text-xs text-gray-400">
+                  ({cl.items.length} items completed)
+                </span>
+              )}
             </Link>
           </div>
           <div className="flex items-center gap-3">
@@ -232,6 +239,26 @@ export default function CycleView() {
   const { data: cycle, isLoading: cycleLoading, error: cycleError } = useCycleDetail(cycleId)
   const { data: checklists = [], isLoading: checklistsLoading } = useCycleChecklists(cycleId)
 
+  // Fetch recent events for all embryos in this cycle
+  const { data: allEvents = [] } = useQuery({
+    queryKey: ['cycles', cycleId, 'events'],
+    queryFn: async () => {
+      if (!cycle?.embryos?.length) return []
+      const results = await Promise.all(
+        cycle.embryos.map((em: EmbryoSummary) =>
+          api.get<EmbryoEvent[]>(`/embryos/${em.id}/events`).then(events =>
+            events.map(ev => ({ ...ev, _embryo_code: em.embryo_code }))
+          )
+        )
+      )
+      return results
+        .flat()
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 10)
+    },
+    enabled: !!cycle?.embryos?.length,
+  })
+
   if (cycleLoading) {
     return (
       <div className="p-6 flex items-center justify-center min-h-64">
@@ -256,14 +283,7 @@ export default function CycleView() {
     )
   }
 
-  // Derive recent activity from embryo events embedded in cycle data (if available),
-  // or from the embryo-level latest_grade timestamps as a proxy.
-  // The cycle detail includes embryos with latest_grade but not raw events.
-  // We surface the embryos sorted by their last-activity timestamp as a best-effort
-  // recent activity list until a dedicated events endpoint is wired up.
-  const recentActivity = [...(cycle.embryos ?? [])]
-    .filter((e) => e.latest_grade !== null)
-    .slice(0, 10)
+  const recentActivity = allEvents as (EmbryoEvent & { _embryo_code: string })[]
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -367,9 +387,15 @@ export default function CycleView() {
           <h2 className="text-base font-semibold text-gray-800">
             Checklists
             {checklistsLoading && (
-              <span className="ml-2 text-xs font-normal text-gray-400">Loading…</span>
+              <span className="ml-2 text-xs font-normal text-gray-400">Loading...</span>
             )}
           </h2>
+          <Link
+            to="/settings"
+            className="text-xs text-blue-600 hover:underline"
+          >
+            Manage Templates
+          </Link>
         </div>
         <div className="px-5 py-2">
           <ChecklistsSection checklists={checklists} />
@@ -386,24 +412,22 @@ export default function CycleView() {
             <p className="text-sm text-gray-400 py-4">No recorded events yet.</p>
           ) : (
             <ul className="divide-y divide-gray-100">
-              {recentActivity.map((embryo) => (
-                <li key={embryo.id} className="py-3 flex items-center gap-3 text-sm">
+              {recentActivity.map((ev) => (
+                <li key={ev.id} className="py-3 flex items-center gap-3 text-sm">
                   <span className="text-gray-400 tabular-nums w-36 shrink-0">
-                    {formatRecentActivityDate(
-                      (embryo.latest_grade as Record<string, string> | null)?.observed_at ??
-                        new Date().toISOString()
-                    )}
+                    {formatRecentActivityDate(ev.created_at)}
                   </span>
                   <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-700">
-                    grade_recorded
+                    {ev.event_type.replace(/_/g, ' ')}
                   </span>
                   <span className="text-blue-600 font-medium">
-                    <Link to={`/embryos/${embryo.id}`} className="hover:underline">
-                      {embryo.embryo_code}
+                    <Link to={`/embryos/${ev.embryo_id}`} className="hover:underline">
+                      {ev._embryo_code}
                     </Link>
                   </span>
-                  <span className="text-gray-400">
-                    {formatGrade(embryo.latest_grade)}
+                  <span className="text-gray-500">
+                    Day {ev.event_day}
+                    {ev.time_hpi != null && ` · ${ev.time_hpi.toFixed(1)}h HPI`}
                   </span>
                 </li>
               ))}
