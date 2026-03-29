@@ -1,14 +1,16 @@
 import uuid
 from collections.abc import AsyncGenerator
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from ivf_lab.config.settings import settings
 from ivf_lab.domain.models.clinic import Clinic
+from ivf_lab.domain.models.patient_alias import PatientAlias
 from ivf_lab.domain.models.user import User
 from ivf_lab.infrastructure.auth.password import hash_password
 from ivf_lab.infrastructure.api import deps
@@ -19,6 +21,27 @@ def _make_session_factory() -> async_sessionmaker[AsyncSession]:
     """Create a session factory with NullPool so connections are not reused across event loops."""
     engine = create_async_engine(settings.database_url, echo=False, poolclass=NullPool)
     return async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def cleanup_stale_test_data() -> None:
+    """Remove any stale test data left by previous failed test runs."""
+    import asyncio
+
+    async def _cleanup() -> None:
+        factory = _make_session_factory()
+        async with factory() as sess:
+            result = await sess.execute(select(Clinic.id).where(Clinic.name == "Test Clinic"))
+            clinic_ids = [row[0] for row in result.fetchall()]
+            if clinic_ids:
+                for cid in clinic_ids:
+                    await sess.execute(delete(PatientAlias).where(PatientAlias.clinic_id == cid))
+                await sess.execute(delete(User).where(User.email == "embryologist@test.com"))
+                for cid in clinic_ids:
+                    await sess.execute(delete(Clinic).where(Clinic.id == cid))
+            await sess.commit()
+
+    asyncio.run(_cleanup())
 
 
 @pytest_asyncio.fixture
@@ -34,13 +57,14 @@ async def test_clinic() -> AsyncGenerator[Clinic, None]:
     yield clinic
 
     async with factory() as sess:
+        await sess.execute(delete(PatientAlias).where(PatientAlias.clinic_id == clinic_id))
         await sess.execute(delete(User).where(User.clinic_id == clinic_id))
         await sess.execute(delete(Clinic).where(Clinic.id == clinic_id))
         await sess.commit()
 
 
 @pytest_asyncio.fixture
-async def test_user(test_clinic: Clinic) -> User:
+async def test_user(test_clinic: Clinic) -> AsyncGenerator[User, None]:
     factory = _make_session_factory()
     user = User(
         id=uuid.uuid4(),
@@ -55,7 +79,11 @@ async def test_user(test_clinic: Clinic) -> User:
         sess.add(user)
         await sess.commit()
 
-    return user
+    yield user
+
+    async with factory() as sess:
+        await sess.execute(delete(User).where(User.id == user.id))
+        await sess.commit()
 
 
 @pytest_asyncio.fixture
