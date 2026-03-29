@@ -84,3 +84,27 @@ export interface ChecklistInstance {
   created_at: string
   items: Array<{ item_index: number; value: Record<string, unknown>; completed_by: string; completed_at: string }>
 }
+
+export interface UserResponse {
+  id: string
+  email: string
+  full_name: string
+  role: string
+  is_active: boolean
+  created_at: string
+}
+
+export interface CycleWeekDay {
+  date: string
+  cycles: Cycle[]
+}
+
+export interface StorageLocation {
+  id: string
+  name: string
+  type: string
+  parent_id: string | null
+  is_managed: boolean
+  capacity: number | null
+  children?: StorageLocation[]
+}

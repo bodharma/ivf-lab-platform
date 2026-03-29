@@ -6,6 +6,9 @@ import Dashboard from './pages/Dashboard'
 import CycleView from './pages/CycleView'
 import EmbryoDetail from './pages/EmbryoDetail'
 import ChecklistRunner from './pages/ChecklistRunner'
+import WeekView from './pages/WeekView'
+import Settings from './pages/Settings'
+import Export from './pages/Export'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth()
@@ -30,6 +33,9 @@ export default function App() {
           <Route path="cycles/:id" element={<CycleView />} />
           <Route path="embryos/:id" element={<EmbryoDetail />} />
           <Route path="checklists/:id" element={<ChecklistRunner />} />
+          <Route path="week" element={<WeekView />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="export" element={<Export />} />
         </Route>
       </Routes>
     </BrowserRouter>
