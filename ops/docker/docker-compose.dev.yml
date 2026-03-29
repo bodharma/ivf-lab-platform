@@ -1,0 +1,35 @@
+# Development overrides — run with:
+# docker compose -f ops/docker/docker-compose.yml -f ops/docker/docker-compose.dev.yml up
+
+services:
+  app:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    command: uvicorn ivf_lab.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../../backend/src:/app/src
+    environment:
+      IVF_DEBUG: "true"
+      IVF_DATABASE_URL: "postgresql+asyncpg://ivf_app:ivf_pass@db:5432/ivf_lab"
+      IVF_REDIS_URL: "redis://redis:6379/0"
+
+  db:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  # Disable production services in dev
+  nginx:
+    profiles: [production]
+  grafana:
+    profiles: [monitoring]
+  loki:
+    profiles: [monitoring]
+  prometheus:
+    profiles: [monitoring]
