@@ -1,4 +1,3 @@
-from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -8,14 +7,11 @@ class Settings(BaseSettings):
     # App
     debug: bool = False
     secret_key: str = "change-me-in-production"
-    allowed_origins: list[str] = ["http://localhost:5173"]
+    allowed_origins: str = "http://localhost:5173"
 
-    @field_validator("allowed_origins", mode="before")
-    @classmethod
-    def parse_origins(cls, v: object) -> object:
-        if isinstance(v, str):
-            return [o.strip() for o in v.split(",")]
-        return v
+    @property
+    def allowed_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
 
     # Database
     database_url: str = "postgresql+asyncpg://ivf_app:ivf_pass@localhost:5432/ivf_lab"
