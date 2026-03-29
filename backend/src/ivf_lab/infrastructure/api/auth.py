@@ -49,11 +49,18 @@ async def refresh(body: RefreshRequest) -> TokenResponse:
 @router.get("/me", response_model=UserResponse)
 async def me(
     current_user: Annotated[dict, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_db)],
 ) -> UserResponse:
+    import uuid
+
+    repo = UserRepository(session)
+    user = await repo.get_by_id(uuid.UUID(current_user["sub"]))
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
     return UserResponse(
-        id=current_user["sub"],
-        email="",
-        full_name="",
-        role=current_user["role"],
-        clinic_id=current_user["clinic_id"],
+        id=str(user.id),
+        email=user.email,
+        full_name=user.full_name,
+        role=str(user.role),
+        clinic_id=str(user.clinic_id),
     )
