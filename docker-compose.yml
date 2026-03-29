@@ -1,0 +1,60 @@
+x-shared-env: &shared-env
+  # Database
+  IVF_DATABASE_URL: postgresql+asyncpg://ivf_app:${POSTGRES_PASSWORD:-ivf_pass}@postgres:5432/ivf_lab
+
+  # App
+  IVF_SECRET_KEY: ${IVF_SECRET_KEY:-change-me-in-production}
+  IVF_DEBUG: ${IVF_DEBUG:-false}
+  IVF_ALLOWED_ORIGINS: ${IVF_ALLOWED_ORIGINS:-*}
+
+  # Redis
+  IVF_REDIS_URL: redis://redis:6379/0
+
+  # JWT
+  IVF_JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${IVF_JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-15}
+  IVF_JWT_REFRESH_TOKEN_EXPIRE_DAYS: ${IVF_JWT_REFRESH_TOKEN_EXPIRE_DAYS:-7}
+
+services:
+  app:
+    build: ./backend
+    environment:
+      <<: *shared-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  web:
+    build: ./frontend/apps/embryologist-console
+    ports:
+      - "${WEB_PORT:-3000}:80"
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ivf_lab
+      POSTGRES_USER: ivf_app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ivf_pass}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ivf_app -d ivf_lab"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redisdata:/data
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
