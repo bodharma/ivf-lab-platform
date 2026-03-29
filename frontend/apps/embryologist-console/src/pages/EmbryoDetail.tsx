@@ -234,7 +234,7 @@ function ActionModal({ action, embryoId, currentDay, onClose, onSuccess }: Actio
 // ---------------------------------------------------------------------------
 
 export default function EmbryoDetail() {
-  const { embryoId, cycleId } = useParams<{ embryoId: string; cycleId: string }>()
+  const { id: embryoId } = useParams<{ id: string }>()
   const [activeAction, setActiveAction] = useState<ActionType | null>(null)
 
   const {
@@ -258,13 +258,13 @@ export default function EmbryoDetail() {
     enabled: !!embryoId,
   })
 
+  const cycleId = embryo?.cycle_id
   const {
     data: cycle,
   } = useQuery({
-    queryKey: ['cycles', cycleId ?? embryo?.cycle_id],
-    queryFn: () =>
-      api.get<CycleDetail>(`/cycles/${cycleId ?? embryo?.cycle_id}`),
-    enabled: !!(cycleId ?? embryo?.cycle_id),
+    queryKey: ['cycles', cycleId],
+    queryFn: () => api.get<CycleDetail>(`/cycles/${cycleId}`),
+    enabled: !!cycleId,
   })
 
   const inseminationTime = cycle?.insemination_time ?? null
@@ -288,7 +288,7 @@ export default function EmbryoDetail() {
     )
   }
 
-  const backHref = cycleId ? `/cycles/${cycleId}` : `/cycles/${embryo.cycle_id}`
+  const backHref = `/cycles/${embryo.cycle_id}`
 
   const handleActionSuccess = () => {
     setActiveAction(null)
