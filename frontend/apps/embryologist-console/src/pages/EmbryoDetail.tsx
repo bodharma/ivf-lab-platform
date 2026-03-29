@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
 import type { Embryo, EmbryoEvent, CycleDetail } from '../types'
 import EventTimeline from '../components/EventTimeline'
@@ -155,6 +155,125 @@ function GradeHistory({ events }: GradeHistoryProps) {
   )
 }
 
+// ---------------------------------------------------------------------------
+// Action Forms (Observe, Vitrify, Transfer, Discard)
+// ---------------------------------------------------------------------------
+
+function ActionForm({
+  action,
+  embryoId,
+  currentDay,
+  onSuccess,
+  onCancel,
+}: {
+  action: ActionType
+  embryoId: string
+  currentDay: number
+  onSuccess: () => void
+  onCancel: () => void
+}) {
+  const qc = useQueryClient()
+  const [notes, setNotes] = useState('')
+  const [reason, setReason] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  const eventConfig: Record<string, { event_type: string; data: () => Record<string, unknown> }> = {
+    observe: {
+      event_type: 'observation',
+      data: () => ({ note: notes || 'Observation recorded' }),
+    },
+    vitrify: {
+      event_type: 'disposition_change',
+      data: () => ({ from: 'in_culture', to: 'vitrified', reason: notes || undefined }),
+    },
+    transfer: {
+      event_type: 'disposition_change',
+      data: () => ({ from: 'in_culture', to: 'transferred', reason: notes || undefined }),
+    },
+    discard: {
+      event_type: 'disposition_change',
+      data: () => ({ from: 'in_culture', to: 'discarded', reason: reason || notes }),
+    },
+  }
+
+  const mutation = useMutation({
+    mutationFn: () => {
+      const cfg = eventConfig[action]
+      return api.post(`/embryos/${embryoId}/events`, {
+        event_type: cfg.event_type,
+        event_day: currentDay,
+        observed_at: new Date().toISOString(),
+        data: cfg.data(),
+        notes: notes || null,
+      })
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['embryos', embryoId] })
+      onSuccess()
+    },
+    onError: (err: Error) => setError(err.message),
+  })
+
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); if (action === 'discard' && !reason) return; mutation.mutate() }} className="space-y-4">
+      {action === 'discard' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Reason for discard *</label>
+          <input
+            type="text"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+            placeholder="e.g., Poor morphology, arrested development"
+            required
+          />
+        </div>
+      )}
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+        <textarea
+          rows={3}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          placeholder="Optional notes..."
+        />
+      </div>
+
+      {error && (
+        <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-md px-3 py-2">{error}</p>
+      )}
+
+      <div className="flex gap-3 justify-end">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={mutation.isPending}
+          className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={mutation.isPending}
+          className={`px-4 py-2 text-sm font-medium rounded-lg disabled:opacity-50 ${
+            action === 'discard'
+              ? 'bg-red-600 text-white hover:bg-red-700'
+              : action === 'vitrify'
+              ? 'bg-cyan-600 text-white hover:bg-cyan-700'
+              : action === 'transfer'
+              ? 'bg-green-600 text-white hover:bg-green-700'
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
+        >
+          {mutation.isPending ? 'Saving...' : action === 'observe' ? 'Save Observation' : action === 'discard' ? 'Confirm Discard' : `Confirm ${action.charAt(0).toUpperCase() + action.slice(1)}`}
+        </button>
+      </div>
+    </form>
+  )
+}
+
 interface ActionModalProps {
   action: ActionType
   embryoId: string
@@ -203,25 +322,13 @@ function ActionModal({ action, embryoId, currentDay, onClose, onSuccess }: Actio
             />
           )}
           {action !== 'grade' && (
-            <div className="space-y-4">
-              <p className="text-sm text-gray-600">
-                {action === 'observe' && 'Record an observation for this embryo.'}
-                {action === 'vitrify' && 'Mark this embryo as vitrified and record storage details.'}
-                {action === 'transfer' && 'Mark this embryo as transferred.'}
-                {action === 'discard' && 'Mark this embryo as discarded. This action cannot be undone.'}
-              </p>
-              <p className="text-xs text-gray-400">
-                This form is not yet implemented. Use Grade to record grading events.
-              </p>
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={onClose}
-                  className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
+            <ActionForm
+              action={action}
+              embryoId={embryoId}
+              currentDay={currentDay}
+              onSuccess={onSuccess}
+              onCancel={onClose}
+            />
           )}
         </div>
       </div>
