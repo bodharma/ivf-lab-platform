@@ -1,3 +1,5 @@
+import uuid
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,3 +16,11 @@ class UserRepository(BaseRepository[User]):
             select(User).where(User.email == email, User.is_active.is_(True))
         )
         return result.scalar_one_or_none()
+
+    async def list_users(self, clinic_id: uuid.UUID) -> list[User]:
+        result = await self._session.execute(
+            select(User)
+            .where(User.clinic_id == clinic_id)
+            .order_by(User.full_name)
+        )
+        return list(result.scalars().all())

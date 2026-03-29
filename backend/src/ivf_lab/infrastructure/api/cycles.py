@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -17,6 +17,7 @@ from ivf_lab.infrastructure.schemas.cycle import (
     CycleResponse,
     CycleTodayResponse,
     CycleUpdate,
+    CycleWeekResponse,
     EmbryoSummary,
 )
 
@@ -163,6 +164,61 @@ async def get_today_cycles(
         date=date.today(),
         cycles=cycle_details,
     )
+
+
+ASSESSMENT_DAYS = [1, 2, 3, 5, 6, 7]
+
+
+def _assessment_dates_for_cycle(
+    insemination_time: datetime,
+    window_start: date,
+    window_end: date,
+) -> list[date]:
+    """Return assessment dates for a cycle that fall within [window_start, window_end]."""
+    if insemination_time.tzinfo is None:
+        insemination_time = insemination_time.replace(tzinfo=timezone.utc)
+    insem_date = insemination_time.date()
+    result = []
+    for day in ASSESSMENT_DAYS:
+        assessment_date = insem_date + timedelta(days=day - 1)
+        if window_start <= assessment_date <= window_end:
+            result.append(assessment_date)
+    return result
+
+
+@router.get("/week", response_model=list[CycleWeekResponse])
+async def get_week_cycles(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[dict, Depends(get_current_user)],
+) -> list[CycleWeekResponse]:
+    clinic_id = uuid.UUID(current_user["clinic_id"])
+    repo = CycleRepository(session)
+    cycles = await repo.get_week_cycles(clinic_id)
+
+    today = date.today()
+    window_end = today + timedelta(days=6)
+
+    # Map date -> list of cycles needing assessment that day
+    date_to_cycles: dict[date, list[CycleResponse]] = {}
+    for d in (today + timedelta(days=i) for i in range(7)):
+        date_to_cycles[d] = []
+
+    for cycle in cycles:
+        if cycle.insemination_time is None:
+            continue
+        assessment_dates = _assessment_dates_for_cycle(
+            cycle.insemination_time, today, window_end
+        )
+        cycle_response = _cycle_to_response(cycle)
+        for assessment_date in assessment_dates:
+            if assessment_date in date_to_cycles:
+                date_to_cycles[assessment_date].append(cycle_response)
+
+    return [
+        CycleWeekResponse(date=d, cycles=date_to_cycles[d])
+        for d in sorted(date_to_cycles)
+        if date_to_cycles[d]
+    ]
 
 
 @router.post("", response_model=CycleResponse)

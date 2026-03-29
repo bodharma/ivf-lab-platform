@@ -7,8 +7,10 @@ from ivf_lab.infrastructure.api.cycles import router as cycles_router
 from ivf_lab.infrastructure.api.embryos import router as embryos_router
 from ivf_lab.infrastructure.api.audit import router as audit_router
 from ivf_lab.infrastructure.api.checklists import router as checklists_router
+from ivf_lab.infrastructure.api.export import router as export_router
 from ivf_lab.infrastructure.api.patients import router as patients_router
 from ivf_lab.infrastructure.api.storage import router as storage_router
+from ivf_lab.infrastructure.api.users import router as users_router
 
 
 def create_app() -> FastAPI:
@@ -31,6 +33,8 @@ def create_app() -> FastAPI:
     app.include_router(checklists_router)
     app.include_router(storage_router)
     app.include_router(audit_router)
+    app.include_router(users_router)
+    app.include_router(export_router)
 
     @app.get("/health")
     async def health() -> dict[str, str]:

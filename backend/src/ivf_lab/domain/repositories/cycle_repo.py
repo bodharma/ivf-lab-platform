@@ -79,6 +79,16 @@ class CycleRepository(BaseRepository[Cycle]):
                 latest[event.embryo_id] = event
         return latest
 
+    async def get_week_cycles(self, clinic_id: uuid.UUID) -> list[Cycle]:
+        """Active cycles that have embryos in culture."""
+        result = await self._session.execute(
+            select(Cycle).where(
+                Cycle.clinic_id == clinic_id,
+                Cycle.status == "active",
+            ).order_by(Cycle.insemination_time)
+        )
+        return list(result.scalars().all())
+
     async def get_patient_alias(self, patient_alias_id: uuid.UUID) -> PatientAlias | None:
         return await self._session.get(PatientAlias, patient_alias_id)
 

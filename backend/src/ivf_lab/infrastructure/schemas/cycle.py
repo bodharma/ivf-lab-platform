@@ -58,3 +58,8 @@ class CycleDetailResponse(CycleResponse):
 class CycleTodayResponse(BaseModel):
     date: date
     cycles: list[CycleDetailResponse]
+
+
+class CycleWeekResponse(BaseModel):
+    date: date
+    cycles: list[CycleResponse]

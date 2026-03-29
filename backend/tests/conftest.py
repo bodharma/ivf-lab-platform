@@ -54,6 +54,8 @@ def pytest_configure(config: object) -> None:
                     await _delete_clinic_data(sess, cid)
             # Also clean up any orphaned test users not covered by clinic deletion
             await sess.execute(delete(User).where(User.email == "embryologist@test.com"))
+            await sess.execute(delete(User).where(User.email == "admin@test.com"))
+            await sess.execute(delete(User).where(User.email == "newembryo@test.com"))
             await sess.commit()
 
     asyncio.run(_cleanup())
