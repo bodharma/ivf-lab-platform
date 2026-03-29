@@ -11,6 +11,8 @@ from sqlalchemy.pool import NullPool
 from ivf_lab.config.settings import settings
 from ivf_lab.domain.models.clinic import Clinic
 from ivf_lab.domain.models.cycle import Cycle
+from ivf_lab.domain.models.embryo import Embryo
+from ivf_lab.domain.models.embryo_event import EmbryoEvent
 from ivf_lab.domain.models.patient_alias import PatientAlias
 from ivf_lab.domain.models.user import User
 from ivf_lab.infrastructure.auth.password import hash_password
@@ -24,6 +26,16 @@ def _make_session_factory() -> async_sessionmaker[AsyncSession]:
     return async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
 
 
+async def _delete_clinic_data(sess: AsyncSession, clinic_id: uuid.UUID) -> None:
+    """Delete all data for a clinic in correct FK dependency order."""
+    await sess.execute(delete(EmbryoEvent).where(EmbryoEvent.clinic_id == clinic_id))
+    await sess.execute(delete(Embryo).where(Embryo.clinic_id == clinic_id))
+    await sess.execute(delete(Cycle).where(Cycle.clinic_id == clinic_id))
+    await sess.execute(delete(PatientAlias).where(PatientAlias.clinic_id == clinic_id))
+    await sess.execute(delete(User).where(User.clinic_id == clinic_id))
+    await sess.execute(delete(Clinic).where(Clinic.id == clinic_id))
+
+
 @pytest_asyncio.fixture(scope="session", autouse=True, loop_scope="session")
 async def cleanup_stale_test_data() -> None:
     """Remove any stale test data left by previous failed test runs."""
@@ -33,11 +45,9 @@ async def cleanup_stale_test_data() -> None:
         clinic_ids = [row[0] for row in result.fetchall()]
         if clinic_ids:
             for cid in clinic_ids:
-                await sess.execute(delete(Cycle).where(Cycle.clinic_id == cid))
-                await sess.execute(delete(PatientAlias).where(PatientAlias.clinic_id == cid))
-            await sess.execute(delete(User).where(User.email == "embryologist@test.com"))
-            for cid in clinic_ids:
-                await sess.execute(delete(Clinic).where(Clinic.id == cid))
+                await _delete_clinic_data(sess, cid)
+        # Also clean up any orphaned test users not covered by clinic deletion
+        await sess.execute(delete(User).where(User.email == "embryologist@test.com"))
         await sess.commit()
 
 
@@ -54,10 +64,7 @@ async def test_clinic() -> AsyncGenerator[Clinic, None]:
     yield clinic
 
     async with factory() as sess:
-        await sess.execute(delete(Cycle).where(Cycle.clinic_id == clinic_id))
-        await sess.execute(delete(PatientAlias).where(PatientAlias.clinic_id == clinic_id))
-        await sess.execute(delete(User).where(User.clinic_id == clinic_id))
-        await sess.execute(delete(Clinic).where(Clinic.id == clinic_id))
+        await _delete_clinic_data(sess, clinic_id)
         await sess.commit()
 
 
@@ -79,9 +86,8 @@ async def test_user(test_clinic: Clinic) -> AsyncGenerator[User, None]:
 
     yield user
 
-    async with factory() as sess:
-        await sess.execute(delete(User).where(User.id == user.id))
-        await sess.commit()
+    # User deletion is handled by test_clinic teardown via _delete_clinic_data
+    # which deletes in FK-safe order (embryo_events → embryos → cycles → ... → users → clinic)
 
 
 @pytest_asyncio.fixture
