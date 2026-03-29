@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from ivf_lab.config.settings import settings
 from ivf_lab.infrastructure.api.auth import router as auth_router
 from ivf_lab.infrastructure.api.cycles import router as cycles_router
+from ivf_lab.infrastructure.api.embryos import router as embryos_router
 from ivf_lab.infrastructure.api.patients import router as patients_router
 
 
@@ -23,6 +24,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(patients_router)
     app.include_router(cycles_router)
+    app.include_router(embryos_router)
 
     @app.get("/health")
     async def health() -> dict[str, str]:

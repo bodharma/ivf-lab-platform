@@ -33,6 +33,7 @@ async def cleanup_stale_test_data() -> None:
         clinic_ids = [row[0] for row in result.fetchall()]
         if clinic_ids:
             for cid in clinic_ids:
+                await sess.execute(delete(Cycle).where(Cycle.clinic_id == cid))
                 await sess.execute(delete(PatientAlias).where(PatientAlias.clinic_id == cid))
             await sess.execute(delete(User).where(User.email == "embryologist@test.com"))
             for cid in clinic_ids:
@@ -53,6 +54,7 @@ async def test_clinic() -> AsyncGenerator[Clinic, None]:
     yield clinic
 
     async with factory() as sess:
+        await sess.execute(delete(Cycle).where(Cycle.clinic_id == clinic_id))
         await sess.execute(delete(PatientAlias).where(PatientAlias.clinic_id == clinic_id))
         await sess.execute(delete(User).where(User.clinic_id == clinic_id))
         await sess.execute(delete(Clinic).where(Clinic.id == clinic_id))
