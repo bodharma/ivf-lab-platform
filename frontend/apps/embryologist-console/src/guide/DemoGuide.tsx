@@ -14,10 +14,24 @@ const DISMISSED_KEY = 'ivf_guide_dismissed'
  * For steps with route=null, resolve dynamic routes based on the step's target.
  * Uses the step target attribute (not index) so it works regardless of role filtering.
  */
+/**
+ * Cache of routes resolved during the tour, so we can navigate back
+ * to previously visited pages (e.g. embryo detail from checklist).
+ */
+const visitedRoutes: Record<string, string> = {}
+
 function resolveDynamicRoute(stepTarget: string): string | null {
-  if (stepTarget.includes('embryo-table')) {
+  const key = stepTarget.includes('embryo-table') ? 'cycle'
+    : (stepTarget.includes('grade-history') || stepTarget.includes('action-buttons') || stepTarget.includes('event-timeline')) ? 'embryo'
+    : stepTarget.includes('checklist-runner') ? 'checklist'
+    : stepTarget.includes('add-embryos') ? 'cycle'
+    : null
+
+  // Try to find a link on the current page
+  if (stepTarget.includes('embryo-table') || stepTarget.includes('add-embryos')) {
     const link = document.querySelector('a[href^="/cycles/"]')
-    return link?.getAttribute('href') ?? null
+    const href = link?.getAttribute('href') ?? null
+    if (href) { visitedRoutes['cycle'] = href; return href }
   }
   if (
     stepTarget.includes('grade-history') ||
@@ -25,12 +39,20 @@ function resolveDynamicRoute(stepTarget: string): string | null {
     stepTarget.includes('event-timeline')
   ) {
     const link = document.querySelector('a[href^="/embryos/"]')
-    return link?.getAttribute('href') ?? null
+    const href = link?.getAttribute('href') ?? null
+    if (href) { visitedRoutes['embryo'] = href; return href }
   }
   if (stepTarget.includes('checklist-runner')) {
     const link = document.querySelector('a[href^="/checklists/"]')
-    return link?.getAttribute('href') ?? null
+    const href = link?.getAttribute('href') ?? null
+    if (href) { visitedRoutes['checklist'] = href; return href }
   }
+
+  // Fall back to a previously visited route for this type
+  if (key && visitedRoutes[key]) {
+    return visitedRoutes[key]
+  }
+
   return null
 }
 
