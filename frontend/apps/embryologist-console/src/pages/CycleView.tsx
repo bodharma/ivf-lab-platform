@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCycleDetail, useCycleChecklists } from '../hooks/useEmbryos'
 import { api } from '../api/client'
+import AddEmbryosModal from '../components/AddEmbryosModal'
 import type { EmbryoSummary, EmbryoEvent, ChecklistInstance, ChecklistTemplate } from '../types'
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -271,6 +273,7 @@ export default function CycleView() {
 
   const { data: cycle, isLoading: cycleLoading, error: cycleError } = useCycleDetail(cycleId)
   const { data: checklists = [], isLoading: checklistsLoading } = useCycleChecklists(cycleId)
+  const [showAddEmbryos, setShowAddEmbryos] = useState(false)
 
   // Fetch recent events for all embryos in this cycle
   const { data: allEvents = [] } = useQuery({
@@ -387,24 +390,33 @@ export default function CycleView() {
               ({cycle.embryos?.length ?? 0})
             </span>
           </h2>
-          {cycle.embryos && cycle.embryos.length > 0 && (
-            <select
-              className="px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors cursor-pointer"
-              defaultValue=""
-              onChange={(e) => {
-                if (e.target.value) navigate(`/embryos/${e.target.value}`)
-              }}
+          <div className="flex gap-2">
+            <button
+              data-tour="add-embryos"
+              onClick={() => setShowAddEmbryos(true)}
+              className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
             >
-              <option value="" disabled>+ Record Event</option>
-              {cycle.embryos
-                .filter((em: EmbryoSummary) => em.disposition === 'in_culture')
-                .map((em: EmbryoSummary) => (
-                  <option key={em.id} value={em.id}>
-                    {em.embryo_code} — Grade / Observe / Dispose
-                  </option>
-                ))}
-            </select>
-          )}
+              + Add Embryos
+            </button>
+            {cycle.embryos && cycle.embryos.length > 0 && (
+              <select
+                className="px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors cursor-pointer"
+                defaultValue=""
+                onChange={(e) => {
+                  if (e.target.value) navigate(`/embryos/${e.target.value}`)
+                }}
+              >
+                <option value="" disabled>+ Record Event</option>
+                {cycle.embryos
+                  .filter((em: EmbryoSummary) => em.disposition === 'in_culture')
+                  .map((em: EmbryoSummary) => (
+                    <option key={em.id} value={em.id}>
+                      {em.embryo_code} — Grade / Observe / Dispose
+                    </option>
+                  ))}
+              </select>
+            )}
+          </div>
         </div>
         <div className="px-5 py-2">
           <EmbryoTable
@@ -463,6 +475,14 @@ export default function CycleView() {
           )}
         </div>
       </section>
+
+      {showAddEmbryos && (
+        <AddEmbryosModal
+          cycleId={cycleId}
+          existingCount={cycle.embryos?.length ?? 0}
+          onClose={() => setShowAddEmbryos(false)}
+        />
+      )}
     </div>
   )
 }

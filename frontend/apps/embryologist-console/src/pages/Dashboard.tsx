@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useTodayCycles } from '../hooks/useCycles'
+import NewCycleModal from '../components/NewCycleModal'
 import type { CycleDetail, EmbryoSummary } from '../types'
 
 // ---------------------------------------------------------------------------
@@ -173,6 +175,7 @@ function CycleCard({ cycle, first }: { cycle: CycleDetail; first?: boolean }) {
 export default function Dashboard() {
   const { user, logout } = useAuth()
   const { data, isLoading, isError, error } = useTodayCycles()
+  const [showNewCycle, setShowNewCycle] = useState(false)
 
   const cycles = data ? sortByUrgency(data.cycles) : []
   const displayDate = data?.date ? formatDate(data.date) : formatDate(new Date().toISOString())
@@ -188,13 +191,24 @@ export default function Dashboard() {
             Welcome, {user?.full_name || user?.role || 'Embryologist'}
           </p>
         </div>
-        <button
-          onClick={logout}
-          className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-        >
-          Sign Out
-        </button>
+        <div className="flex gap-2">
+          <button
+            data-tour="new-cycle"
+            onClick={() => setShowNewCycle(true)}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            + New Cycle
+          </button>
+          <button
+            onClick={logout}
+            className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+          >
+            Sign Out
+          </button>
+        </div>
       </div>
+
+      {showNewCycle && <NewCycleModal onClose={() => setShowNewCycle(false)} />}
 
       {/* Loading */}
       {isLoading && (
