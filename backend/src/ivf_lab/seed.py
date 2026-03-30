@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from ivf_lab.config.settings import settings
-from ivf_lab.domain.models.checklist import ChecklistTemplate
+from ivf_lab.domain.models.checklist import ChecklistTemplate, ChecklistInstance, ChecklistItemResponse
 from ivf_lab.domain.models.clinic import Clinic
 from ivf_lab.domain.models.cycle import Cycle
 from ivf_lab.domain.models.embryo import Embryo
@@ -83,6 +83,38 @@ async def seed() -> None:
             session.add(tank)
             await session.flush()
 
+            canister = StorageLocation(
+                clinic_id=clinic.id,
+                name="Canister 1",
+                location_type="canister",
+                is_managed=True,
+                parent_id=tank.id,
+                capacity=6,
+            )
+            session.add(canister)
+            await session.flush()
+
+            cane = StorageLocation(
+                clinic_id=clinic.id,
+                name="Cane 1A",
+                location_type="goblet",
+                is_managed=True,
+                parent_id=canister.id,
+                capacity=5,
+            )
+            session.add(cane)
+
+            cane_2 = StorageLocation(
+                clinic_id=clinic.id,
+                name="Cane 1B",
+                location_type="goblet",
+                is_managed=True,
+                parent_id=canister.id,
+                capacity=5,
+            )
+            session.add(cane_2)
+            await session.flush()
+
             # Active cycle (Day 5)
             now = datetime.now(timezone.utc)
             insem_time = now - timedelta(hours=114)
@@ -148,6 +180,27 @@ async def seed() -> None:
                             "symmetry": "even",
                             "multinucleation": False,
                         },
+                        performed_by=embryologist.id,
+                    )
+                )
+
+            # Day 5 blastocyst grades for first 4 embryos of Cycle 1
+            blast_grades = [
+                {"expansion": 4, "icm": "A", "te": "B"},  # 4AB — top quality
+                {"expansion": 3, "icm": "B", "te": "B"},  # 3BB — good
+                {"expansion": 4, "icm": "B", "te": "C"},  # 4BC — fair
+                {"expansion": 2, "icm": "C", "te": "C"},  # 2CC — poor
+            ]
+            for i, e in enumerate(embryos[:4]):
+                session.add(
+                    EmbryoEvent(
+                        clinic_id=clinic.id,
+                        embryo_id=e.id,
+                        event_type="blastocyst_grade",
+                        event_day=5,
+                        observed_at=insem_time + timedelta(hours=114),
+                        time_hpi=114.0,
+                        data=blast_grades[i],
                         performed_by=embryologist.id,
                     )
                 )
@@ -311,20 +364,117 @@ async def seed() -> None:
             )
 
             # Checklist template
+            day5_template = ChecklistTemplate(
+                clinic_id=clinic.id,
+                name="Day 5 Assessment",
+                procedure_type="assessment",
+                items=[
+                    {"order": 1, "label": "Confirm patient alias", "required": True, "field_type": "checkbox"},
+                    {"order": 2, "label": "Remove dish from incubator", "required": True, "field_type": "checkbox"},
+                    {"order": 3, "label": "Check dish label matches cycle", "required": True, "field_type": "checkbox"},
+                    {"order": 4, "label": "Assess each embryo", "required": True, "field_type": "checkbox"},
+                    {"order": 5, "label": "Record grades in system", "required": True, "field_type": "checkbox"},
+                    {"order": 6, "label": "Decision: transfer/freeze/discard", "required": True, "field_type": "checkbox"},
+                    {"order": 7, "label": "Return dish to incubator", "required": True, "field_type": "checkbox"},
+                    {"order": 8, "label": "Confirm incubator door closed", "required": True, "field_type": "checkbox"},
+                ],
+            )
+            session.add(day5_template)
+            await session.flush()
+
+            # Checklist instances for Cycle 1
+            # 1. Completed checklist
+            completed_cl = ChecklistInstance(
+                clinic_id=clinic.id,
+                template_id=day5_template.id,
+                cycle_id=cycle.id,
+                embryo_id=None,
+                status="completed",
+                started_at=insem_time + timedelta(hours=110),
+                completed_at=insem_time + timedelta(hours=112),
+                completed_by=embryologist.id,
+            )
+            session.add(completed_cl)
+            await session.flush()
+
+            for i in range(8):
+                session.add(
+                    ChecklistItemResponse(
+                        clinic_id=clinic.id,
+                        checklist_instance_id=completed_cl.id,
+                        item_index=i,
+                        value={"checked": True},
+                        completed_by=embryologist.id,
+                        completed_at=insem_time + timedelta(hours=110 + i * 0.25),
+                    )
+                )
+
+            # 2. In-progress checklist (3 of 8 items done)
+            in_progress_cl = ChecklistInstance(
+                clinic_id=clinic.id,
+                template_id=day5_template.id,
+                cycle_id=cycle.id,
+                embryo_id=embryos[0].id,
+                status="in_progress",
+                started_at=insem_time + timedelta(hours=113),
+                completed_at=None,
+                completed_by=None,
+            )
+            session.add(in_progress_cl)
+            await session.flush()
+
+            for i in range(3):
+                session.add(
+                    ChecklistItemResponse(
+                        clinic_id=clinic.id,
+                        checklist_instance_id=in_progress_cl.id,
+                        item_index=i,
+                        value={"checked": True},
+                        completed_by=embryologist.id,
+                        completed_at=insem_time + timedelta(hours=113 + i * 0.25),
+                    )
+                )
+
+            # 3. Pending checklist (no items completed)
+            pending_cl = ChecklistInstance(
+                clinic_id=clinic.id,
+                template_id=day5_template.id,
+                cycle_id=cycle.id,
+                embryo_id=None,
+                status="pending",
+                started_at=None,
+                completed_at=None,
+                completed_by=None,
+            )
+            session.add(pending_cl)
+
+            # Additional checklist templates
             session.add(
                 ChecklistTemplate(
                     clinic_id=clinic.id,
-                    name="Day 5 Assessment",
-                    procedure_type="assessment",
+                    name="IVF Preparation",
+                    procedure_type="ivf",
                     items=[
-                        {"order": 1, "label": "Confirm patient alias", "required": True, "field_type": "checkbox"},
-                        {"order": 2, "label": "Remove dish from incubator", "required": True, "field_type": "checkbox"},
-                        {"order": 3, "label": "Check dish label matches cycle", "required": True, "field_type": "checkbox"},
-                        {"order": 4, "label": "Assess each embryo", "required": True, "field_type": "checkbox"},
-                        {"order": 5, "label": "Record grades in system", "required": True, "field_type": "checkbox"},
-                        {"order": 6, "label": "Decision: transfer/freeze/discard", "required": True, "field_type": "checkbox"},
-                        {"order": 7, "label": "Return dish to incubator", "required": True, "field_type": "checkbox"},
-                        {"order": 8, "label": "Confirm incubator door closed", "required": True, "field_type": "checkbox"},
+                        {"order": 1, "label": "Verify patient identity", "required": True, "field_type": "checkbox"},
+                        {"order": 2, "label": "Check culture media temperature", "required": True, "field_type": "checkbox"},
+                        {"order": 3, "label": "Confirm dish labeling", "required": True, "field_type": "checkbox"},
+                        {"order": 4, "label": "Record sperm parameters", "required": True, "field_type": "text"},
+                        {"order": 5, "label": "Number of oocytes inseminated", "required": True, "field_type": "number"},
+                    ],
+                )
+            )
+            session.add(
+                ChecklistTemplate(
+                    clinic_id=clinic.id,
+                    name="ICSI Procedure",
+                    procedure_type="icsi",
+                    items=[
+                        {"order": 1, "label": "Verify patient identity", "required": True, "field_type": "checkbox"},
+                        {"order": 2, "label": "Prepare injection pipette", "required": True, "field_type": "checkbox"},
+                        {"order": 3, "label": "Confirm oocyte maturity", "required": True, "field_type": "checkbox"},
+                        {"order": 4, "label": "Record injection time", "required": True, "field_type": "text"},
+                        {"order": 5, "label": "Number of oocytes injected", "required": True, "field_type": "number"},
+                        {"order": 6, "label": "Return dish to incubator", "required": True, "field_type": "checkbox"},
                     ],
                 )
             )
@@ -335,9 +485,11 @@ async def seed() -> None:
     print(f"Seeded clinic: ReproMed IVF Clinic")
     print(f"Users: {len(user_data)} (password: {DEFAULT_PASSWORD})")
     print(f"Patients: 5 aliases")
-    print(f"Cycles: 3 active (Day 5/Day 3/Day 1, varied dispositions)")
-    print(f"Storage: 1 room + 1 cryo tank")
-    print(f"Checklist templates: 1 (Day 5 Assessment)")
+    print(f"Cycles: 3 active (Day 5 / Day 3 / Day 1)")
+    print(f"Embryos: 12 total (6+4+2) with all dispositions")
+    print(f"Storage: 1 room + 1 tank + 1 canister + 2 canes")
+    print(f"Checklist templates: 3 (Day 5, IVF Prep, ICSI)")
+    print(f"Checklist instances: 3 (completed, in_progress, pending)")
 
 
 if __name__ == "__main__":
