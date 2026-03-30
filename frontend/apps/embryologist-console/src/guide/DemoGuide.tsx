@@ -20,40 +20,30 @@ const DISMISSED_KEY = 'ivf_guide_dismissed'
  */
 const visitedRoutes: Record<string, string> = {}
 
+/** Scan the current page for links and cache them for later use */
+function cacheVisibleLinks() {
+  const cycleLink = document.querySelector('a[href^="/cycles/"]')
+  if (cycleLink) visitedRoutes['cycle'] = cycleLink.getAttribute('href')!
+  const embryoLink = document.querySelector('a[href^="/embryos/"]')
+  if (embryoLink) visitedRoutes['embryo'] = embryoLink.getAttribute('href')!
+  const checklistLink = document.querySelector('a[href^="/checklists/"]')
+  if (checklistLink) visitedRoutes['checklist'] = checklistLink.getAttribute('href')!
+}
+
 function resolveDynamicRoute(stepTarget: string): string | null {
-  const key = stepTarget.includes('embryo-table') ? 'cycle'
+  // Always cache whatever links are on the current page
+  cacheVisibleLinks()
+
+  const needsType =
+    (stepTarget.includes('embryo-table') || stepTarget.includes('add-embryos')) ? 'cycle'
     : (stepTarget.includes('grade-history') || stepTarget.includes('action-buttons') || stepTarget.includes('event-timeline')) ? 'embryo'
     : stepTarget.includes('checklist-runner') ? 'checklist'
-    : stepTarget.includes('add-embryos') ? 'cycle'
     : null
 
-  // Try to find a link on the current page
-  if (stepTarget.includes('embryo-table') || stepTarget.includes('add-embryos')) {
-    const link = document.querySelector('a[href^="/cycles/"]')
-    const href = link?.getAttribute('href') ?? null
-    if (href) { visitedRoutes['cycle'] = href; return href }
-  }
-  if (
-    stepTarget.includes('grade-history') ||
-    stepTarget.includes('action-buttons') ||
-    stepTarget.includes('event-timeline')
-  ) {
-    const link = document.querySelector('a[href^="/embryos/"]')
-    const href = link?.getAttribute('href') ?? null
-    if (href) { visitedRoutes['embryo'] = href; return href }
-  }
-  if (stepTarget.includes('checklist-runner')) {
-    const link = document.querySelector('a[href^="/checklists/"]')
-    const href = link?.getAttribute('href') ?? null
-    if (href) { visitedRoutes['checklist'] = href; return href }
-  }
+  if (!needsType) return null
 
-  // Fall back to a previously visited route for this type
-  if (key && visitedRoutes[key]) {
-    return visitedRoutes[key]
-  }
-
-  return null
+  // Return cached route (just updated by cacheVisibleLinks)
+  return visitedRoutes[needsType] ?? null
 }
 
 /** Helper to click a settings tab using data-tour-tab attribute */
