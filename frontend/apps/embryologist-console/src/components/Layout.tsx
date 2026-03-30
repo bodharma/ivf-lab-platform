@@ -1,5 +1,6 @@
 import { Outlet, NavLink } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import DemoGuide from '../guide/DemoGuide'
 
 export default function Layout() {
   const { user } = useAuth()
@@ -65,6 +66,7 @@ export default function Layout() {
       </aside>
       <main className="flex-1">
         <Outlet />
+        <DemoGuide />
       </main>
     </div>
   )
