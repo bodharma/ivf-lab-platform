@@ -10,6 +10,7 @@ RUN uv sync --no-dev --no-install-project
 
 # Copy application code and install project
 COPY src/ src/
+COPY ops_seed.py .
 RUN uv sync --no-dev
 
 ENV PATH="/app/.venv/bin:$PATH"

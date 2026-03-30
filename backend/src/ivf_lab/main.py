@@ -29,10 +29,31 @@ import ivf_lab.domain.models.storage  # noqa: F401
 import ivf_lab.domain.models.audit_log  # noqa: F401
 
 
+async def _seed_if_empty() -> None:
+    """Seed demo data on first run (when users table is empty)."""
+    import structlog
+    from sqlalchemy import func, select
+    from ivf_lab.config.database import async_session_factory
+    from ivf_lab.domain.models.user import User
+
+    log = structlog.get_logger()
+    async with async_session_factory() as session:
+        count = await session.scalar(select(func.count()).select_from(User))
+        if count and count > 0:
+            log.info("seed_skipped", reason="users already exist", count=count)
+            return
+
+    # Import and run the seed script
+    from ops_seed import seed
+    await seed()
+    log.info("seed_complete")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    await _seed_if_empty()
     yield
 
 
