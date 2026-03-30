@@ -3,6 +3,7 @@
 import asyncio
 from datetime import date, datetime, timedelta, timezone
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from ivf_lab.config.settings import settings
@@ -25,6 +26,22 @@ async def seed() -> None:
 
     async with factory() as session:
         async with session.begin():
+            # Clean existing data (reverse FK order)
+            for table in [
+                "audit_logs",
+                "checklist_item_responses",
+                "checklist_instances",
+                "checklist_templates",
+                "embryo_events",
+                "embryos",
+                "cycles",
+                "storage_locations",
+                "patient_aliases",
+                "users",
+                "clinics",
+            ]:
+                await session.execute(text(f"DELETE FROM {table}"))
+
             # Clinic
             clinic = Clinic(name="ReproMed IVF Clinic", timezone="Europe/Kyiv")
             session.add(clinic)
