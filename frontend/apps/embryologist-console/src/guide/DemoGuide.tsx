@@ -70,6 +70,8 @@ export default function DemoGuide() {
       const { action, index, status, type } = data
 
       if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
+        controls.stop()
+        setRun(false)
         localStorage.setItem(DISMISSED_KEY, 'true')
         navigate('/')
         return
