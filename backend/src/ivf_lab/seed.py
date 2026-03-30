@@ -152,6 +152,164 @@ async def seed() -> None:
                     )
                 )
 
+            # Cycle 2 — Day 3, fresh_ivf, mixed dispositions
+            insem_time_2 = now - timedelta(hours=66)  # Day 3
+            cycle_2 = Cycle(
+                clinic_id=clinic.id,
+                patient_alias_id=patients[1].id,
+                cycle_code="CYC-2026-0002",
+                cycle_type="fresh_ivf",
+                status="active",
+                start_date=date.today() - timedelta(days=10),
+                retrieval_date=date.today() - timedelta(days=3),
+                insemination_time=insem_time_2,
+                assigned_embryologist_id=embryologist.id,
+            )
+            session.add(cycle_2)
+            await session.flush()
+
+            # Cycle 2 embryos: 2 in_culture, 1 vitrified, 1 arrested
+            c2_dispositions = ["in_culture", "in_culture", "vitrified", "arrested"]
+            c2_embryos = []
+            for i, disp in enumerate(c2_dispositions, start=1):
+                e = Embryo(
+                    clinic_id=clinic.id,
+                    cycle_id=cycle_2.id,
+                    embryo_code=f"E{i}",
+                    source="fresh",
+                    disposition=disp,
+                )
+                session.add(e)
+                c2_embryos.append(e)
+            await session.flush()
+
+            # Day 1 fertilization for Cycle 2
+            for e in c2_embryos:
+                session.add(
+                    EmbryoEvent(
+                        clinic_id=clinic.id,
+                        embryo_id=e.id,
+                        event_type="fertilization_check",
+                        event_day=1,
+                        observed_at=insem_time_2 + timedelta(hours=17),
+                        time_hpi=17.0,
+                        data={"pronuclei": "2pn", "polar_bodies": 2},
+                        performed_by=embryologist.id,
+                    )
+                )
+
+            # Day 3 cleavage for Cycle 2 in_culture embryos
+            for e in c2_embryos[:2]:
+                session.add(
+                    EmbryoEvent(
+                        clinic_id=clinic.id,
+                        embryo_id=e.id,
+                        event_type="cleavage_grade",
+                        event_day=3,
+                        observed_at=insem_time_2 + timedelta(hours=66),
+                        time_hpi=66.0,
+                        data={"cell_count": 8, "fragmentation": 1, "symmetry": "even", "multinucleation": False},
+                        performed_by=embryologist.id,
+                    )
+                )
+
+            # Disposition change events for vitrified + arrested
+            session.add(
+                EmbryoEvent(
+                    clinic_id=clinic.id,
+                    embryo_id=c2_embryos[2].id,
+                    event_type="disposition_change",
+                    event_day=3,
+                    observed_at=insem_time_2 + timedelta(hours=68),
+                    time_hpi=68.0,
+                    data={"from": "in_culture", "to": "vitrified", "reason": "Good quality, patient request"},
+                    performed_by=embryologist.id,
+                )
+            )
+            session.add(
+                EmbryoEvent(
+                    clinic_id=clinic.id,
+                    embryo_id=c2_embryos[3].id,
+                    event_type="disposition_change",
+                    event_day=3,
+                    observed_at=insem_time_2 + timedelta(hours=68),
+                    time_hpi=68.0,
+                    data={"from": "in_culture", "to": "arrested", "reason": "Development arrest at 4-cell"},
+                    performed_by=embryologist.id,
+                )
+            )
+
+            # Cycle 3 — Day 1, frozen_et, transferred + discarded
+            insem_time_3 = now - timedelta(hours=20)  # Day 1
+            cycle_3 = Cycle(
+                clinic_id=clinic.id,
+                patient_alias_id=patients[2].id,
+                cycle_code="CYC-2026-0003",
+                cycle_type="frozen_et",
+                status="active",
+                start_date=date.today() - timedelta(days=7),
+                retrieval_date=date.today() - timedelta(days=1),
+                insemination_time=insem_time_3,
+                assigned_embryologist_id=users[1].id,  # Dr. Shevchenko
+            )
+            session.add(cycle_3)
+            await session.flush()
+
+            c3_dispositions = ["transferred", "discarded"]
+            c3_embryos = []
+            for i, disp in enumerate(c3_dispositions, start=1):
+                e = Embryo(
+                    clinic_id=clinic.id,
+                    cycle_id=cycle_3.id,
+                    embryo_code=f"E{i}",
+                    source="frozen",
+                    disposition=disp,
+                )
+                session.add(e)
+                c3_embryos.append(e)
+            await session.flush()
+
+            # Fertilization events for Cycle 3
+            for e in c3_embryos:
+                session.add(
+                    EmbryoEvent(
+                        clinic_id=clinic.id,
+                        embryo_id=e.id,
+                        event_type="fertilization_check",
+                        event_day=1,
+                        observed_at=insem_time_3 + timedelta(hours=17),
+                        time_hpi=17.0,
+                        data={"pronuclei": "2pn", "polar_bodies": 2},
+                        performed_by=users[1].id,
+                    )
+                )
+
+            # Disposition changes
+            session.add(
+                EmbryoEvent(
+                    clinic_id=clinic.id,
+                    embryo_id=c3_embryos[0].id,
+                    event_type="disposition_change",
+                    event_day=1,
+                    observed_at=insem_time_3 + timedelta(hours=19),
+                    time_hpi=19.0,
+                    data={"from": "in_culture", "to": "transferred", "reason": "Single embryo transfer"},
+                    performed_by=users[1].id,
+                )
+            )
+            session.add(
+                EmbryoEvent(
+                    clinic_id=clinic.id,
+                    embryo_id=c3_embryos[1].id,
+                    event_type="disposition_change",
+                    event_day=1,
+                    observed_at=insem_time_3 + timedelta(hours=19),
+                    time_hpi=19.0,
+                    data={"from": "in_culture", "to": "discarded", "reason": "Abnormal fertilization"},
+                    performed_by=users[1].id,
+                )
+            )
+
             # Checklist template
             session.add(
                 ChecklistTemplate(
@@ -177,7 +335,7 @@ async def seed() -> None:
     print(f"Seeded clinic: ReproMed IVF Clinic")
     print(f"Users: {len(user_data)} (password: {DEFAULT_PASSWORD})")
     print(f"Patients: 5 aliases")
-    print(f"Cycles: 1 active (Day 5, 6 embryos)")
+    print(f"Cycles: 3 active (Day 5/Day 3/Day 1, varied dispositions)")
     print(f"Storage: 1 room + 1 cryo tank")
     print(f"Checklist templates: 1 (Day 5 Assessment)")
 
