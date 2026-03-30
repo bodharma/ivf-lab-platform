@@ -731,6 +731,7 @@ export default function Settings() {
           {visibleTabs.map((tab) => (
             <button
               key={tab.id}
+              data-tour-tab={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                 resolvedTab === tab.id
@@ -745,9 +746,9 @@ export default function Settings() {
       </div>
 
       {/* Tab content */}
-      {resolvedTab === 'users' && <UsersTab />}
-      {resolvedTab === 'templates' && <ChecklistTemplatesTab />}
-      {resolvedTab === 'storage' && <StorageTab />}
+      {resolvedTab === 'users' && <div data-tour="settings-users"><UsersTab /></div>}
+      {resolvedTab === 'templates' && <div data-tour="settings-templates"><ChecklistTemplatesTab /></div>}
+      {resolvedTab === 'storage' && <div data-tour="settings-storage"><StorageTab /></div>}
     </div>
   )
 }

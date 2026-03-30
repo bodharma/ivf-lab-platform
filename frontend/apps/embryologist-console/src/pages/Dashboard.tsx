@@ -82,7 +82,7 @@ function EmbryoBox({ embryo }: { embryo: EmbryoSummary }) {
   )
 }
 
-function CycleCard({ cycle }: { cycle: CycleDetail }) {
+function CycleCard({ cycle, first }: { cycle: CycleDetail; first?: boolean }) {
   const currentDay = getCurrentDay(cycle.insemination_time)
   const summary = cycle.summary as {
     total_embryos?: number
@@ -93,7 +93,7 @@ function CycleCard({ cycle }: { cycle: CycleDetail }) {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5" data-tour={first ? 'cycle-card' : undefined}>
       {/* Header row */}
       <div className="flex items-start justify-between mb-3">
         <div>
@@ -113,6 +113,7 @@ function CycleCard({ cycle }: { cycle: CycleDetail }) {
         <div className="flex flex-col items-end gap-1 shrink-0 ml-4">
           {currentDay !== null && (
             <span
+              data-tour={first ? 'day-badge' : undefined}
               className={[
                 'text-sm font-bold px-2 py-0.5 rounded-full',
                 currentDay >= 5
@@ -136,7 +137,7 @@ function CycleCard({ cycle }: { cycle: CycleDetail }) {
 
       {/* Embryo mini-grid */}
       {cycle.embryos.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-3">
+        <div className="flex flex-wrap gap-1.5 mb-3" data-tour={first ? 'embryo-grid' : undefined}>
           {cycle.embryos.map((embryo) => (
             <EmbryoBox key={embryo.id} embryo={embryo} />
           ))}
@@ -179,7 +180,7 @@ export default function Dashboard() {
   return (
     <div className="p-6 max-w-5xl mx-auto">
       {/* Page header */}
-      <div className="flex items-start justify-between mb-8">
+      <div data-tour="dashboard-header" className="flex items-start justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Today</h1>
           <p className="text-sm text-gray-500 mt-0.5">{displayDate}</p>
@@ -258,8 +259,8 @@ export default function Dashboard() {
           <p className="text-sm text-gray-500">
             {cycles.length} active {cycles.length === 1 ? 'cycle' : 'cycles'}
           </p>
-          {cycles.map((cycle) => (
-            <CycleCard key={cycle.id} cycle={cycle} />
+          {cycles.map((cycle, idx) => (
+            <CycleCard key={cycle.id} cycle={cycle} first={idx === 0} />
           ))}
         </div>
       )}

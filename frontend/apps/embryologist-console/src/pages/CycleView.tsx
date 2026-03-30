@@ -379,7 +379,7 @@ export default function CycleView() {
       </div>
 
       {/* Embryo table */}
-      <section className="bg-white rounded-lg border border-gray-200 shadow-sm">
+      <section data-tour="embryo-table" className="bg-white rounded-lg border border-gray-200 shadow-sm">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h2 className="text-base font-semibold text-gray-800">
             Embryos

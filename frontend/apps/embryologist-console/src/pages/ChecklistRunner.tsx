@@ -329,7 +329,7 @@ export default function ChecklistRunner() {
         )}
 
         {/* Item list */}
-        <div className="p-6">
+        <div data-tour="checklist-runner" className="p-6">
           {templateItems.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-8">
               No items found in this checklist template.

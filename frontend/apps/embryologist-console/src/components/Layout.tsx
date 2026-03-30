@@ -8,12 +8,12 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen flex bg-gray-50">
-      <aside className="w-56 bg-white border-r border-gray-200 p-4">
+      <aside className="w-56 bg-white border-r border-gray-200 p-4 flex flex-col">
         <div className="mb-6">
           <h2 className="text-lg font-bold text-blue-600">IVF Lab</h2>
           <p className="text-xs text-gray-400">{user?.role}</p>
         </div>
-        <nav className="space-y-1">
+        <nav data-tour="sidebar-nav" className="space-y-1">
           <NavLink
             to="/"
             end
@@ -50,6 +50,18 @@ export default function Layout() {
             </NavLink>
           )}
         </nav>
+        <button
+          data-tour="replay-guide"
+          onClick={() => {
+            localStorage.removeItem('ivf_guide_dismissed')
+            window.dispatchEvent(new Event('ivf-guide-restart'))
+          }}
+          className="mt-auto pt-4 text-xs text-gray-400 hover:text-blue-600 flex items-center gap-1.5"
+          title="Replay demo guide"
+        >
+          <span className="w-5 h-5 rounded-full border border-current flex items-center justify-center text-[10px] font-bold">?</span>
+          Guide
+        </button>
       </aside>
       <main className="flex-1">
         <Outlet />

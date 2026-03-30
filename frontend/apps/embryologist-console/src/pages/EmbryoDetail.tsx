@@ -454,7 +454,7 @@ export default function EmbryoDetail() {
       </div>
 
       {/* Grade history */}
-      <section className="bg-white border border-gray-200 rounded-xl p-5 mb-5 shadow-sm">
+      <section data-tour="grade-history" className="bg-white border border-gray-200 rounded-xl p-5 mb-5 shadow-sm">
         <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
           Grade History
         </h2>
@@ -462,7 +462,7 @@ export default function EmbryoDetail() {
       </section>
 
       {/* Event timeline */}
-      <section className="bg-white border border-gray-200 rounded-xl p-5 mb-6 shadow-sm">
+      <section data-tour="event-timeline" className="bg-white border border-gray-200 rounded-xl p-5 mb-6 shadow-sm">
         <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
           Event Timeline
         </h2>
@@ -470,7 +470,7 @@ export default function EmbryoDetail() {
       </section>
 
       {/* Action buttons */}
-      <div className="flex flex-wrap gap-3">
+      <div data-tour="action-buttons" className="flex flex-wrap gap-3">
         {actions.map(({ key, label }) => (
           <button
             key={key}
