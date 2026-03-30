@@ -80,7 +80,16 @@ export default function DemoGuide() {
       if (type === EVENTS.STEP_AFTER) {
         const nextIndex = action === ACTIONS.PREV ? index - 1 : index + 1
 
-        if (nextIndex < 0 || nextIndex >= steps.length) return
+        if (nextIndex < 0) return
+
+        // Last step — finish the tour
+        if (nextIndex >= steps.length) {
+          controls.stop()
+          setRun(false)
+          localStorage.setItem(DISMISSED_KEY, 'true')
+          navigate('/')
+          return
+        }
 
         const nextStep = steps[nextIndex]
 
