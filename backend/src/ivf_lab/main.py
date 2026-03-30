@@ -44,7 +44,7 @@ async def _seed_if_empty() -> None:
             return
 
     # Import and run the seed script
-    from ops_seed import seed
+    from ivf_lab.seed import seed
     await seed()
     log.info("seed_complete")
 
